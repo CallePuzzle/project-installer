@@ -85,6 +85,6 @@ variable "microservices" {
 }
 
 variable "repository_secrets" {
-  type = map(string)
+  type    = map(string)
   default = {}
 }

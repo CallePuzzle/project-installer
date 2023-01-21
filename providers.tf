@@ -13,7 +13,8 @@ terraform {
       source = "mongodb/mongodbatlas"
     }
     cloudflare = {
-      source  = "cloudflare/cloudflare"
+      source = "cloudflare/cloudflare"
     }
   }
+  required_version = ">= 1.3"
 }
