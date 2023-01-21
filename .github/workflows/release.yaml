@@ -1,0 +1,75 @@
+---
+name: Release
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  check:
+    name: Check release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 18
+
+      - name: Analyze commits
+        id: next_release_version
+        run: |
+          mkdir semantic-release
+          cd semantic-release
+          cat > package.json << EOF
+          {
+            "name": "next-release",
+            "version": "1.0.0",
+            "description": "",
+            "main": "index.js",
+            "author": "",
+            "license": "ISC"
+          }
+          EOF
+          npm install --save-dev semantic-release@18 > /dev/null
+          sed -i "s#const {isCi, branch, prBranch, isPr} = context.envCi;#const {isCi, branch, prBranch, isPr} = {isCi: false, branch: '${{ github.event.pull_request.head.ref }}', prBranch: undefined, isPr: undefined};#" node_modules/semantic-release/index.js
+          echo "TAG=$(npx semantic-release -b ${{ github.event.pull_request.head.ref }}  -p '@semantic-release/commit-analyzer' --dry-run --no-ci | grep -oiP 'the next release version is *\K.*')" >> $GITHUB_OUTPUT
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create comment if analyze commits fails
+        uses: peter-evans/create-or-update-comment@v1
+        if: steps.next_release_version.outputs.TAG == ''
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            Commit message format does not follow the Message Conventions and it is necessary to generate the next tag.
+
+            https://semantic-release.gitbook.io/semantic-release/#commit-message-format
+
+      - name: Cancel if analyze commits fails
+        if: steps.next_release_version.outputs.TAG == ''
+        uses: actions/github-script@v3
+        with:
+          script: |
+            core.setFailed("Commit message format does not follow the Message Conventions and it is necessary to generate the next tag.")
+
+  release:
+    name: Generate release
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Semantic Release
+        id: release
+        uses: cycjimmy/semantic-release-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.KINGKONG_GITHUB_TOKEN }}
